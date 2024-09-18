@@ -26,11 +26,17 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include <math.h>
 
 #include "bsp/board_api.h"
 #include "tusb.h"
 
 #include "usb_descriptors.h"
+
+#define RADIUS 150    // Adjust the radius of the circle
+#define SPEED 0.02  // Adjust the speed of the circle (the smaller, the slower)
+#define OFFSET_X 960
+#define OFFSET_Y 540
 
 //--------------------------------------------------------------------+
 // MACRO CONSTANT TYPEDEF PROTYPES
@@ -115,85 +121,100 @@ static void send_hid_report(uint8_t report_id, uint32_t btn)
 
   switch(report_id)
   {
-    case REPORT_ID_KEYBOARD:
-    {
-      // use to avoid send multiple consecutive zero report for keyboard
-      static bool has_keyboard_key = false;
-
-      if ( btn )
-      {
-        uint8_t keycode[6] = { 0 };
-        keycode[0] = HID_KEY_A;
-
-        tud_hid_keyboard_report(REPORT_ID_KEYBOARD, 0, keycode);
-        has_keyboard_key = true;
-      }else
-      {
-        // send empty key report if previously has key pressed
-        if (has_keyboard_key) tud_hid_keyboard_report(REPORT_ID_KEYBOARD, 0, NULL);
-        has_keyboard_key = false;
-      }
-    }
-    break;
-
     case REPORT_ID_MOUSE:
     {
-      int8_t const delta = 5;
+      if ( !btn ) return;
 
-      // no button, right + down, no scroll, no pan
-      // tud_hid_mouse_report(REPORT_ID_MOUSE, 0x00, delta, delta, 0, 0);
-      tud_hid_abs_mouse_report(REPORT_ID_MOUSE, 0x00, 300, 300, 0, 0);
+      uint32_t time_ms = board_millis();
+
+      // Calculate the angle based on the elapsed time
+      double angle = (double)time_ms * SPEED;  // This controls the speed of the movement
+
+      // Calculate X and Y deltas using sine and cosine for circular motion
+      double x = OFFSET_X + RADIUS * cos(angle);
+      double y = OFFSET_Y + RADIUS * sin(angle);
+
+      // scale
+      // least common multiple (LCM) of 1920 and 1080 is 17,280 = 0x4380
+      // LCM_1920_1080 = 17,280 (check hid_device.h)
+      // x = LCM_1920_1080 / 1920 = 9
+      // y = LCM_1920_1080 / 1080 = 16
+      x *= 9;
+      y *= 16;
+
+      tud_hid_abs_mouse_report(REPORT_ID_MOUSE, 0x00, (uint16_t)x, (uint16_t)y, 0x80, 0x80);
     }
     break;
 
-    case REPORT_ID_CONSUMER_CONTROL:
-    {
-      // use to avoid send multiple consecutive zero report
-      static bool has_consumer_key = false;
+    // case REPORT_ID_KEYBOARD:
+    // {
+    //   // use to avoid send multiple consecutive zero report for keyboard
+    //   static bool has_keyboard_key = false;
 
-      if ( btn )
-      {
-        // volume down
-        uint16_t volume_down = HID_USAGE_CONSUMER_VOLUME_DECREMENT;
-        tud_hid_report(REPORT_ID_CONSUMER_CONTROL, &volume_down, 2);
-        has_consumer_key = true;
-      }else
-      {
-        // send empty key report (release key) if previously has key pressed
-        uint16_t empty_key = 0;
-        if (has_consumer_key) tud_hid_report(REPORT_ID_CONSUMER_CONTROL, &empty_key, 2);
-        has_consumer_key = false;
-      }
-    }
-    break;
+    //   if ( btn )
+    //   {
+    //     uint8_t keycode[6] = { 0 };
+    //     keycode[0] = HID_KEY_A;
 
-    case REPORT_ID_GAMEPAD:
-    {
-      // use to avoid send multiple consecutive zero report for keyboard
-      static bool has_gamepad_key = false;
+    //     tud_hid_keyboard_report(REPORT_ID_KEYBOARD, 0, keycode);
+    //     has_keyboard_key = true;
+    //   }else
+    //   {
+    //     // send empty key report if previously has key pressed
+    //     if (has_keyboard_key) tud_hid_keyboard_report(REPORT_ID_KEYBOARD, 0, NULL);
+    //     has_keyboard_key = false;
+    //   }
+    // }
+    // break;
 
-      hid_gamepad_report_t report =
-      {
-        .x   = 0, .y = 0, .z = 0, .rz = 0, .rx = 0, .ry = 0,
-        .hat = 0, .buttons = 0
-      };
+    // case REPORT_ID_CONSUMER_CONTROL:
+    // {
+    //   // use to avoid send multiple consecutive zero report
+    //   static bool has_consumer_key = false;
 
-      if ( btn )
-      {
-        report.hat = GAMEPAD_HAT_UP;
-        report.buttons = GAMEPAD_BUTTON_A;
-        tud_hid_report(REPORT_ID_GAMEPAD, &report, sizeof(report));
+    //   if ( btn )
+    //   {
+    //     // volume down
+    //     uint16_t volume_down = HID_USAGE_CONSUMER_VOLUME_DECREMENT;
+    //     tud_hid_report(REPORT_ID_CONSUMER_CONTROL, &volume_down, 2);
+    //     has_consumer_key = true;
+    //   }else
+    //   {
+    //     // send empty key report (release key) if previously has key pressed
+    //     uint16_t empty_key = 0;
+    //     if (has_consumer_key) tud_hid_report(REPORT_ID_CONSUMER_CONTROL, &empty_key, 2);
+    //     has_consumer_key = false;
+    //   }
+    // }
+    // break;
 
-        has_gamepad_key = true;
-      }else
-      {
-        report.hat = GAMEPAD_HAT_CENTERED;
-        report.buttons = 0;
-        if (has_gamepad_key) tud_hid_report(REPORT_ID_GAMEPAD, &report, sizeof(report));
-        has_gamepad_key = false;
-      }
-    }
-    break;
+    // case REPORT_ID_GAMEPAD:
+    // {
+    //   // use to avoid send multiple consecutive zero report for keyboard
+    //   static bool has_gamepad_key = false;
+
+    //   hid_gamepad_report_t report =
+    //   {
+    //     .x   = 0, .y = 0, .z = 0, .rz = 0, .rx = 0, .ry = 0,
+    //     .hat = 0, .buttons = 0
+    //   };
+
+    //   if ( btn )
+    //   {
+    //     report.hat = GAMEPAD_HAT_UP;
+    //     report.buttons = GAMEPAD_BUTTON_A;
+    //     tud_hid_report(REPORT_ID_GAMEPAD, &report, sizeof(report));
+
+    //     has_gamepad_key = true;
+    //   }else
+    //   {
+    //     report.hat = GAMEPAD_HAT_CENTERED;
+    //     report.buttons = 0;
+    //     if (has_gamepad_key) tud_hid_report(REPORT_ID_GAMEPAD, &report, sizeof(report));
+    //     has_gamepad_key = false;
+    //   }
+    // }
+    // break;
 
     default: break;
   }
@@ -204,7 +225,7 @@ static void send_hid_report(uint8_t report_id, uint32_t btn)
 void hid_task(void)
 {
   // Poll every 10ms
-  const uint32_t interval_ms = 5;
+  const uint32_t interval_ms = 1;
   static uint32_t start_ms = 0;
 
   if ( board_millis() - start_ms < interval_ms) return; // not enough time
@@ -233,11 +254,11 @@ void tud_hid_report_complete_cb(uint8_t instance, uint8_t const* report, uint16_
   (void) instance;
   (void) len;
 
-  uint8_t next_report_id = report[0] + 1u;
-
   // only interested in mouse for now,
   // no need to send more reports in this (interval_ms) frame
   return;
+
+  uint8_t next_report_id = report[0] + 1u;
 
   if (next_report_id < REPORT_ID_COUNT)
   {
