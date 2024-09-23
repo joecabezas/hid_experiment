@@ -43,6 +43,9 @@
         "compare": "c",
         "type_traits": "c",
         "tusb.h": "c",
-        "usb_descriptors.h": "c"
+        "usb_descriptors.h": "c",
+        "atomic": "c",
+        "cstdint": "c",
+        "schedule.h": "c"
     }
 }

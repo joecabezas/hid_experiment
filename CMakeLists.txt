@@ -40,8 +40,12 @@ cmake_minimum_required(VERSION 3.13)
 add_executable(dev_hid_composite)
 
 target_sources(dev_hid_composite PUBLIC
-        ${CMAKE_CURRENT_LIST_DIR}/main.c
+        ${CMAKE_CURRENT_LIST_DIR}/main.cpp
         ${CMAKE_CURRENT_LIST_DIR}/usb_descriptors.c
+        ${CMAKE_CURRENT_LIST_DIR}/interpolation_strategies.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/job.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/point.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/schedule.cpp
         )
 
 # Make sure TinyUSB can find tusb_config.h

@@ -2,7 +2,9 @@
 #include <stdio.h>
 
 #include "bsp/board_api.h"
+#include "interpolation_strategies.h"
 #include "pico/stdlib.h"
+#include "schedule.h"
 #include "tusb.h"
 #include "usb_descriptors.h"
 
@@ -19,6 +21,7 @@ enum {
 };
 
 static uint32_t blink_interval_ms = BLINK_NOT_MOUNTED;
+static Schedule schedule;
 
 void led_blinking_task(void);
 void hid_task(void);
@@ -62,21 +65,29 @@ void cdc_task(void) {
 //--------------------------------------------------------------------+
 
 // Invoked when device is mounted
-void tud_mount_cb(void) { blink_interval_ms = BLINK_MOUNTED; }
+void tud_mount_cb(void) {
+  printf("mounted\n");
+  blink_interval_ms = BLINK_MOUNTED;
+}
 
 // Invoked when device is unmounted
-void tud_umount_cb(void) { blink_interval_ms = BLINK_NOT_MOUNTED; }
+void tud_umount_cb(void) {
+  printf("unmounted\n");
+  blink_interval_ms = BLINK_NOT_MOUNTED;
+}
 
 // Invoked when usb bus is suspended
 // remote_wakeup_en : if host allow us  to perform remote wakeup
 // Within 7ms, device must draw an average of current less than 2.5 mA from bus
 void tud_suspend_cb(bool remote_wakeup_en) {
+  printf("suspended\n");
   (void)remote_wakeup_en;
   blink_interval_ms = BLINK_SUSPENDED;
 }
 
 // Invoked when usb bus is resumed
 void tud_resume_cb(void) {
+  printf("resumed\n");
   blink_interval_ms = tud_mounted() ? BLINK_MOUNTED : BLINK_NOT_MOUNTED;
 }
 
@@ -84,52 +95,88 @@ void tud_resume_cb(void) {
 // USB HID
 //--------------------------------------------------------------------+
 
-static void send_hid_report(uint8_t report_id, uint32_t btn) {
-  // skip if hid is not ready yet
-  if (!tud_hid_ready()) return;
-  if (report_id != REPORT_ID_MOUSE) return;
-  if (!btn) return;
+// static void send_hid_report(uint8_t report_id, uint32_t btn) {
+//   // skip if hid is not ready yet
+//   if (!tud_hid_ready()) return;
+//   if (report_id != REPORT_ID_MOUSE) return;
+//   if (!btn) return;
 
-  uint32_t time_ms = board_millis();
+//   uint32_t time_ms = board_millis();
 
-  // Calculate the angle based on the elapsed time
-  double angle = (double)time_ms * SPEED;
+//   // Calculate the angle based on the elapsed time
+//   double angle = (double)time_ms * SPEED;
 
-  // Calculate X and Y deltas using sine and cosine for circular motion
-  double x = OFFSET_X + RADIUS * cos(angle);
-  double y = OFFSET_Y + RADIUS * sin(angle);
+//   // Calculate X and Y deltas using sine and cosine for circular motion
+//   double x = OFFSET_X + RADIUS * cos(angle);
+//   double y = OFFSET_Y + RADIUS * sin(angle);
 
-  // scale
-  // least common multiple (LCM) of 1920 and 1080 is 17,280 = 0x4380
-  // LCM_1920_1080 = 17,280 (check hid_device.h)
-  // x = LCM_1920_1080 / 1920 = 9
-  // y = LCM_1920_1080 / 1080 = 16
-  x *= 9;
-  y *= 16;
+//   // scale
+//   // least common multiple (LCM) of 1920 and 1080 is 17,280 = 0x4380
+//   // LCM_1920_1080 = 17,280 (check hid_device.h)
+//   // x = LCM_1920_1080 / 1920 = 9
+//   // y = LCM_1920_1080 / 1080 = 16
+//   x *= 9;
+//   y *= 16;
 
-  tud_hid_abs_mouse_report(REPORT_ID_MOUSE, 0x00, (uint16_t)x, (uint16_t)y,
-                           0x80, 0x80);
-}
+//   tud_hid_abs_mouse_report(REPORT_ID_MOUSE, 0x00, (uint16_t)x, (uint16_t)y,
+//                            0x80, 0x80);
+// }
 
 void hid_task(void) {
-  // Poll every 10ms
-  const uint32_t interval_ms = 1;
-  static uint32_t start_ms = 0;
+  uint32_t millis = board_millis();
 
-  if (board_millis() - start_ms < interval_ms) return;
-  start_ms += interval_ms;
+  // // Poll every 10ms
+  // const uint32_t interval_ms = 1;
+  // static uint32_t start_ms = 0;
 
-  printf("hi :3\n");
+  // if (millis - start_ms < interval_ms) return;
+  // start_ms += interval_ms;
 
   uint32_t const btn = board_button_read();
 
+  static uint32_t lastDebounceTime = 0;
+  static uint32_t lastState = 0;
+  static bool allowed = true;
+  // printf("btn:%d\n", btn);
+  // printf("lastState:%d\n", lastState);
+  if (btn != lastState && !btn) {
+    printf("debouncing reset\n");
+    allowed = true;
+    lastDebounceTime = millis;
+  };
+  lastState = btn;
+
+  // printf("hid_task: current jobs: %d\n", schedule.queue.size());
+
   // Remote wakeup
   if (tud_suspended() && btn) {
+    // printf("suspended and button");
     // Wake up host if we are in suspend mode
     // and REMOTE_WAKEUP feature is enabled by host
     tud_remote_wakeup();
   } else {
-    send_hid_report(REPORT_ID_MOUSE, btn);
+    // printf("else");
+    // send_hid_report(REPORT_ID_MOUSE, btn);
+
+    schedule.process();
+
+    if (!btn) return;
+    if ((millis - lastDebounceTime) < 50) return;
+    if (!allowed) return;
+
+    printf("adding job!, jobs now: %d\n", schedule.queue.size());
+    MoveToLinearArgs args{Point2D{300, 300}, Point2D{1290, 820}};
+    StrategyArgsVariant argsVariant = args;
+    Job job(LINEAR, argsVariant, 300u);
+    schedule.add_job(job);
+
+    MoveToLinearArgs args2{Point2D{1290, 820}, Point2D{800, 30}};
+    StrategyArgsVariant argsVariant2 = args2;
+    Job job2(LINEAR, argsVariant2, 100u);
+    schedule.add_job(job2);
+    printf("current jobs: %d\n", schedule.queue.size());
+
+    allowed = false;
   }
 }
 
