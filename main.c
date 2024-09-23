@@ -1,9 +1,8 @@
 #include <math.h>
 #include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
 
 #include "bsp/board_api.h"
+#include "pico/stdlib.h"
 #include "tusb.h"
 #include "usb_descriptors.h"
 
@@ -12,24 +11,22 @@
 #define OFFSET_X 960
 #define OFFSET_Y 540
 
-/* Blink pattern
- * - 250 ms  : device not mounted
- * - 1000 ms : device mounted
- * - 2500 ms : device is suspended
- */
 enum {
   BLINK_NOT_MOUNTED = 250,
   BLINK_MOUNTED = 1000,
   BLINK_SUSPENDED = 2500,
+  BLINK_CDC = 50,
 };
 
 static uint32_t blink_interval_ms = BLINK_NOT_MOUNTED;
 
 void led_blinking_task(void);
 void hid_task(void);
+void cdc_task(void);
 
 int main(void) {
   board_init();
+  stdio_init_all();
 
   // init device stack on configured roothub port
   tud_init(BOARD_TUD_RHPORT);
@@ -39,10 +36,24 @@ int main(void) {
   }
 
   while (1) {
-    tud_task();  // tinyusb device task
+    tud_task();
     led_blinking_task();
 
     hid_task();
+    cdc_task();
+  }
+}
+
+void cdc_task(void) {
+  if (tud_cdc_connected()) {
+    if (tud_cdc_available()) {
+      // blink_interval_ms = BLINK_CDC;
+      // Echo characters received over CDC
+      uint8_t buf[64];
+      uint32_t count = tud_cdc_read(buf, sizeof(buf));
+      tud_cdc_write(buf, count);
+      tud_cdc_write_flush();
+    }
   }
 }
 
@@ -107,6 +118,8 @@ void hid_task(void) {
 
   if (board_millis() - start_ms < interval_ms) return;
   start_ms += interval_ms;
+
+  printf("hi :3\n");
 
   uint32_t const btn = board_button_read();
 

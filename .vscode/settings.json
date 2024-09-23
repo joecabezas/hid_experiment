@@ -41,6 +41,8 @@
         "board_api.h": "c",
         "math.h": "c",
         "compare": "c",
-        "type_traits": "c"
+        "type_traits": "c",
+        "tusb.h": "c",
+        "usb_descriptors.h": "c"
     }
 }

@@ -48,6 +48,10 @@ target_sources(dev_hid_composite PUBLIC
 target_include_directories(dev_hid_composite PUBLIC
         ${CMAKE_CURRENT_LIST_DIR})
 
+# Enable TinyUSB for CDC (Serial) and HID (Mouse + Keyboard)
+pico_enable_stdio_usb(dev_hid_composite 1)
+pico_enable_stdio_uart(dev_hid_composite 0)
+
 # In addition to pico_stdlib required for common PicoSDK functionality, add dependency on tinyusb_device
 # for TinyUSB device support and tinyusb_board for the additional board support library used by the example
 target_link_libraries(dev_hid_composite
