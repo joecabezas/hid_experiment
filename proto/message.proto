@@ -1,0 +1,24 @@
+syntax = "proto3";
+
+enum NetworkCommandType {
+  LINEAR = 0;
+  IDLE = 1;
+};
+
+message NetworkPoint2D {
+  int32 x = 1;
+  int32 y = 2;
+};
+
+message NetworkPoint2DPair {
+  NetworkPoint2D p0 = 1;
+  NetworkPoint2D p1 = 2;
+};
+
+message NetworkCommand {
+  NetworkCommandType cmd = 1;
+  int32 duration = 2;
+  oneof args {
+    NetworkPoint2DPair pair = 3;
+  };
+}

@@ -2,13 +2,14 @@
 #define _SCHEDULE_H_
 
 #include <queue>
+#include <memory>
 
 #include "job.h"
 
 struct Schedule {
-  std::queue<Job> queue;
+  std::queue<std::unique_ptr<Job>> queue;
 
-  void add_job(Job);
+  void add_job(std::unique_ptr<Job>);
   void process();
 };
 
