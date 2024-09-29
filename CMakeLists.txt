@@ -39,13 +39,14 @@ cmake_minimum_required(VERSION 3.13)
 add_executable(dev_hid_composite)
 
 target_sources(dev_hid_composite PUBLIC
-        ${CMAKE_CURRENT_LIST_DIR}/main.cpp
-        ${CMAKE_CURRENT_LIST_DIR}/usb_descriptors.c
         ${CMAKE_CURRENT_LIST_DIR}/interpolators.cpp
         ${CMAKE_CURRENT_LIST_DIR}/job.cpp
         ${CMAKE_CURRENT_LIST_DIR}/linear_job.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/main.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/network.cpp
         ${CMAKE_CURRENT_LIST_DIR}/point.cpp
         ${CMAKE_CURRENT_LIST_DIR}/schedule.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/usb_descriptors.c
 
         ${CMAKE_CURRENT_LIST_DIR}/proto/message.pb.c
         ${CMAKE_CURRENT_LIST_DIR}/lib/nanopb/pb_common.c
